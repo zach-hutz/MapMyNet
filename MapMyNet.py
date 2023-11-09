@@ -14,22 +14,11 @@ from ipaddress import ip_address
 from scapy.all import get_if_addr, ARP, Ether, srp, conf
 
 class ExclusiveCheckBox(QCheckBox):
-    """
-    A checkbox that can only be checked or unchecked by clicking on it.
-    When clicked, it emits a toggled signal with False if it was already checked,
-    and True if it was unchecked and is now checked.
-    """
-    
     def __init__(self, *args, **kwargs):
         super(ExclusiveCheckBox, self).__init__(*args, **kwargs)
         self.setChecked(False)
 
     def mousePressEvent(self, event):
-        """
-        This method is called when the mouse button is pressed over the checkbox.
-        If the checkbox is already checked, it will emit the toggled signal with False, as if it was unchecked.
-        If the checkbox is not already checked, it will proceed with the normal behavior which will check the checkbox.
-        """
         if self.isChecked():
             # Emit the toggled signal with False, as if it was unchecked
             self.toggled.emit(False)
@@ -39,18 +28,10 @@ class ExclusiveCheckBox(QCheckBox):
             super(ExclusiveCheckBox, self).mousePressEvent(event)
 
 class CustomTreeWidget(QTreeWidget):
-    """
-    A custom QTreeWidget that allows copying text from the second column of selected items.
-    """
     def __init__(self, parent=None):
         super().__init__(parent)
 
     def contextMenuEvent(self, event):
-        """
-        Displays a context menu when the user right-clicks on the widget.
-        The context menu contains a "Copy" action that, when triggered,
-        calls the copy_text method to copy the selected text to the clipboard.
-        """
         contextMenu = QMenu(self)
         copyAction = contextMenu.addAction("Copy")
         action = contextMenu.exec_(self.mapToGlobal(event.pos()))
@@ -59,42 +40,19 @@ class CustomTreeWidget(QTreeWidget):
             self.copy_text()
 
     def copy_text(self):
-        """
-        Copies the text from the second column of the selected item to the clipboard.
-        """
         selected_items = self.selectedItems()
         if selected_items:
             text_to_copy = selected_items[0].text(1)  # Assuming you want to copy text from the second column
             QApplication.clipboard().setText(text_to_copy)
 
 class ClickableLineEdit(QLineEdit):
-    """
-    A custom QLineEdit widget that emits a clicked signal when clicked.
-    """
     clicked = pyqtSignal()
 
     def mousePressEvent(self, event):
-        """
-        This method is called when a mouse button is pressed while the mouse cursor is inside the widget.
-        It emits a clicked signal.
-        """
         super().mousePressEvent(event)
         self.clicked.emit()
 
 class ScanThread(QThread):
-    """
-    A QThread subclass that performs network scanning using Nmap.
-
-    Attributes:
-        update_progress (pyqtSignal): A signal emitted to update the progress of the scan.
-        finished (pyqtSignal): A signal emitted when the scan is finished.
-        error_occurred (pyqtSignal): A signal emitted when an error occurs during the scan.
-        result_acquired (pyqtSignal): A signal emitted when the scan results are acquired.
-
-    Args:
-        ips (list): A list of IP addresses to scan.
-        scan_args (str): A string of Nmap scan arguments.
-    """
     update_progress = pyqtSignal(int)
     finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
@@ -148,62 +106,42 @@ class ScanThread(QThread):
         self.finished.emit()  # Emit signal when scanning is finished
 
 class NmapGUI(QMainWindow):
-    class MapMyNet:
-        def __init__(self):
-            """
-            Initializes the MapMyNet class.
+    def __init__(self):
+        super().__init__()
 
-            Attributes:
-            - data: a dictionary to store the network data
-            - filename_to_save: the name of the file to save the results to
-            - tab_widget: a QTabWidget to display the input, results, and visualize tabs
-            - user_checked_save_to_file: a boolean indicating whether the user wants to save the results to a file
-            - input_tab: a QWidget to display the input tab
-            - results_tree: a CustomTreeWidget to display the results in a tree view
-            - visualize_tab: a QWidget to display the visualize tab
-            """
-            super().__init__()
+        self.data = {}
+        self.filename_to_save = None
+        self.setWindowTitle("MapMyNet (Network Reconaissance)")
+        self.setGeometry(100, 100, 700, 00)
 
-            self.data = {}
-            self.filename_to_save = None
-            self.setWindowTitle("MapMyNet (Network Reconaissance)")
-            self.setGeometry(100, 100, 700, 00)
+        self.tab_widget = QTabWidget(self)
+        self.setCentralWidget(self.tab_widget)
+        self.user_checked_save_to_file = True
 
-            self.tab_widget = QTabWidget(self)
-            self.setCentralWidget(self.tab_widget)
-            self.user_checked_save_to_file = True
+        # Input Tab
+        self.input_tab = QWidget()
+        self.tab_widget.addTab(self.input_tab, "Input")
+        self.setup_input_tab()
 
-            # Input Tab
-            self.input_tab = QWidget()
-            self.tab_widget.addTab(self.input_tab, "Input")
-            self.setup_input_tab()
+        # Results Tab
+        self.results_tree = CustomTreeWidget(self)  # Use the subclassed CustomTreeWidget
+        self.results_tree.setHeaderLabels(["Hosts and Ports", "Details"])
+        self.tab_widget.addTab(self.results_tree, "Results")
 
-            # Results Tab
-            self.results_tree = CustomTreeWidget(self)  # Use the subclassed CustomTreeWidget
-            self.results_tree.setHeaderLabels(["Hosts and Ports", "Details"])
-            self.tab_widget.addTab(self.results_tree, "Results")
+        # Visualize Tab
+        self.visualize_tab = QWidget()
+        self.tab_widget.addTab(self.visualize_tab, "Visualize")
+        self.setup_visualize_tab()
 
-            # Visualize Tab
-            self.visualize_tab = QWidget()
-            self.tab_widget.addTab(self.visualize_tab, "Visualize")
-            self.setup_visualize_tab()
-
-            self.results_tree.setColumnWidth(0, self.results_tree.width() // 2)
-            self.results_tree.setColumnWidth(1, self.results_tree.width() // 2)
-            self.results_tree.resizeEvent = self.resize_tree_columns
+        self.results_tree.setColumnWidth(0, self.results_tree.width() // 2)
+        self.results_tree.setColumnWidth(1, self.results_tree.width() // 2)
+        self.results_tree.resizeEvent = self.resize_tree_columns
 
     def resize_tree_columns(self, event):
-        """
-        Resizes the columns of the results tree to be half the width of the tree widget.
-        """
         self.results_tree.setColumnWidth(0, self.results_tree.width() // 2)
         self.results_tree.setColumnWidth(1, self.results_tree.width() // 2)
 
     def setup_input_tab(self):
-        """
-        Sets up the input tab with various widgets such as QLineEdit, QRadioButton, QCheckBox, QPushButton, and QProgressBar.
-        The widgets are arranged using QGridLayout.
-        """
         layout = QGridLayout(self.input_tab)
         layout.setSpacing(20)  # Set spacing between widgets to 20 pixels (roughly 2")
 
@@ -274,13 +212,12 @@ class NmapGUI(QMainWindow):
         layout.addWidget(self.flag_t5_cb, 4, 3)
 
         self.t_flags_group = QButtonGroup(self.input_tab)
-        self.t_flags_group.setExclusive(False)
-        self.add_to_t_group(self.flag_t0_cb)
-        self.add_to_t_group(self.flag_t1_cb)
-        self.add_to_t_group(self.flag_t2_cb)
-        self.add_to_t_group(self.flag_t3_cb)
-        self.add_to_t_group(self.flag_t4_cb)
-        self.add_to_t_group(self.flag_t5_cb)
+        self.t_flags_group.addButton(self.flag_t0_cb)
+        self.t_flags_group.addButton(self.flag_t1_cb)
+        self.t_flags_group.addButton(self.flag_t2_cb)
+        self.t_flags_group.addButton(self.flag_t3_cb)
+        self.t_flags_group.addButton(self.flag_t4_cb)
+        self.t_flags_group.addButton(self.flag_t5_cb)
 
         # Checkbox to save to file
         self.save_to_file_cb = QCheckBox("Save to File", self.input_tab)
@@ -329,65 +266,42 @@ class NmapGUI(QMainWindow):
                         button.setChecked(False)
 
     def setup_visualize_tab(self):
-        """
-        Sets up the 'Visualize' tab in the GUI, including a button to visualize the results.
-        """
         layout = QVBoxLayout(self.visualize_tab)
         self.visualize_button = QPushButton("Visualize Results", self.visualize_tab)
         self.visualize_button.clicked.connect(self.visualize_results)
         layout.addWidget(self.visualize_button)
 
     def prompt_for_filename(self, checked):
-            """
-            Prompts the user to select a filename to save the results to.
-
-            Args:
-                checked (bool): Whether or not the "Save to File" checkbox is checked.
-
-            Returns:
-                None
-            """
-            if checked:
-                filename, _ = QFileDialog.getSaveFileName(self, "Save Results As", "", "Text Files (*.txt);;Web Pages (*.html);;JSON (*.json);;CSV (*.csv);;All Files (*)")
-                if filename:  # If user provided a filename
-                    self.filename_to_save = filename  # Store the filename to use later when saving results
-                else:
-                    self.save_to_file_cb.setChecked(False)  # Uncheck the checkbox if no filename was provided
-                    self.filename_to_save = None  # Set filename_to_save to None if no file was selected
+        if checked:
+            filename, _ = QFileDialog.getSaveFileName(self, "Save Results As", "", "Text Files (*.txt);;Web Pages (*.html);;JSON (*.json);;CSV (*.csv);;All Files (*)")
+            if filename:  # If user provided a filename
+                self.filename_to_save = filename  # Store the filename to use later when saving results
+            else:
+                self.save_to_file_cb.setChecked(False)  # Uncheck the checkbox if no filename was provided
+                self.filename_to_save = None  # Set filename_to_save to None if no file was selected
 
     def specify_port(self):
-            """
-            Displays a dialog box to allow the user to specify a custom port number.
-            If the user clicks OK without entering a port or clicks Cancel, the radio button is set to "Most Common Ports".
-            """
-            if self.specify_port_rb.isChecked():
-                self.specify_port_entry.setVisible(True)
-                port, ok = QInputDialog.getText(self, "Specify Port", "Enter the port number:")
-                if ok and port:
-                    self.specify_port_entry.setText(port)
-                else:
-                    # If the user clicks OK without entering a port or clicks Cancel, set the radio button to "Most Common Ports"
-                    self.common_ports_rb.setChecked(True)
-                    self.specify_port_entry.clear()  # Clear the input box
-                    self.specify_port_entry.setVisible(False)
-                self.specify_port_entry.setFixedWidth(100)  # Set the fixed width again after the dialog is closed
+        if self.specify_port_rb.isChecked():
+            self.specify_port_entry.setVisible(True)
+            port, ok = QInputDialog.getText(self, "Specify Port", "Enter the port number:")
+            if ok and port:
+                self.specify_port_entry.setText(port)
             else:
+                # If the user clicks OK without entering a port or clicks Cancel, set the radio button to "Most Common Ports"
+                self.common_ports_rb.setChecked(True)
                 self.specify_port_entry.clear()  # Clear the input box
                 self.specify_port_entry.setVisible(False)
+            self.specify_port_entry.setFixedWidth(100)  # Set the fixed width again after the dialog is closed
+        else:
+            self.specify_port_entry.clear()  # Clear the input box
+            self.specify_port_entry.setVisible(False)
 
     def on_entry_click(self):
-            """
-            Clears the host_entry text field and sets its background color to grey when the user clicks on it.
-            """
-            if self.host_entry.text() == "Enter host or select a file":
-                self.host_entry.clear()
-                self.host_entry.setStyleSheet("color: white; background-color: grey")
+        if self.host_entry.text() == "Enter host or select a file":
+            self.host_entry.clear()
+            self.host_entry.setStyleSheet("color: white; background-color: grey")
 
     def on_focusout(self):
-        """
-        This method is called when the focus leaves the host_entry field.
-        If the field is empty, it sets the default text and background color.
-        """
         if not self.host_entry.text():
             self.host_entry.setText("Enter host or select a file")
             self.host_entry.setStyleSheet("color: white; background-color: grey")
@@ -425,24 +339,11 @@ class NmapGUI(QMainWindow):
         webbrowser.open(f'file://{full_path}')
 
     def select_file(self):
-        """
-        Opens a file dialog to allow the user to select a file, and sets the text of the host_entry field to the selected file path.
-        """
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
         if file_path:
             self.host_entry.setText(file_path)
 
     def enumerate_ips(self, start_ip, end_ip):
-        """
-        Enumerate all IP addresses between start_ip and end_ip (inclusive).
-            
-        Args:
-            start_ip (str): The starting IP address.
-            end_ip (str): The ending IP address.
-            
-        Returns:
-            list: A list of all IP addresses between start_ip and end_ip (inclusive).
-        """
         start = int(ip_address(start_ip))
         end = int(ip_address(start_ip.split('.')[0] + '.' + start_ip.split('.')[1] + '.' + start_ip.split('.')[2] + '.' + end_ip))
         return [str(ip_address(ip)) for ip in range(start, end + 1)]
@@ -528,10 +429,6 @@ class NmapGUI(QMainWindow):
             scan_args += ' -Pn'
         if self.flag_a_cb.isChecked():
             scan_args += ' -A'
-        # Add -T flag if selected
-        for button in self.t_flags_group.buttons():
-            if button.isChecked():
-                scan_args += ' ' + button.text()
 
         # Initialize and start the scan thread
         self.scan_thread = ScanThread(ips, scan_args)
@@ -554,70 +451,52 @@ class NmapGUI(QMainWindow):
         QMessageBox.critical(self, "Error", message)
 
     def update_results_tree(self, data):
-            """
-            Updates the results tree widget with the given data.
+        self.results_tree.clear()  # Clear the previous entries
+        self.data = data  # Store the data as a class variable so we can use it later
+        for host, ports in data.items():
+            host_item = QTreeWidgetItem(self.results_tree)
+            host_item.setText(0, f"Host: {host}")
+            for port, details in ports.items():
+                port_item = QTreeWidgetItem(host_item)
+                port_item.setText(0, f"Port: {port}")
+                port_item.setText(1, f"State: {details['state']}")
 
-            Args:
-                data (dict): A dictionary containing the scan results.
+                # Initialize the ssh_hostkey_parent_item variable
+                ssh_hostkey_parent_item = None
 
-            Returns:
-                None
-            """
-            self.results_tree.clear()  # Clear the previous entries
-            self.data = data  # Store the data as a class variable so we can use it later
-            for host, ports in data.items():
-                host_item = QTreeWidgetItem(self.results_tree)
-                host_item.setText(0, f"Host: {host}")
-                for port, details in ports.items():
-                    port_item = QTreeWidgetItem(host_item)
-                    port_item.setText(0, f"Port: {port}")
-                    port_item.setText(1, f"State: {details['state']}")
+                # Check for details that are not 'state' or 'script'
+                for detail_key, detail_value in details.items():
+                    if detail_key not in ['state', 'script', 'ssh-hostkey']:
+                        if detail_value:
+                            detail_item = QTreeWidgetItem(port_item)
+                            detail_item.setText(0, str(detail_key).capitalize())
+                            detail_item.setText(1, str(detail_value))
 
-                    # Initialize the ssh_hostkey_parent_item variable
-                    ssh_hostkey_parent_item = None
-
-                    # Check for details that are not 'state' or 'script'
-                    for detail_key, detail_value in details.items():
-                        if detail_key not in ['state', 'script', 'ssh-hostkey']:
-                            if detail_value:
-                                detail_item = QTreeWidgetItem(port_item)
-                                detail_item.setText(0, str(detail_key).capitalize())
-                                detail_item.setText(1, str(detail_value))
-
-                    # Now handle 'ssh-hostkey' separately
-                    if 'ssh-hostkey' in details:
-                        ssh_hostkey_output = details['ssh-hostkey']
-                        if ssh_hostkey_output:  # Check if there is any output to add
-                            ssh_hostkey_parent_item = QTreeWidgetItem(port_item)
-                            ssh_hostkey_parent_item.setText(0, "SSH-Hostkey")
-                            for line in ssh_hostkey_output.split('\n'):
-                                if line.strip():  # Make sure the line is not empty
-                                    parts = line.strip().split(' ', 2)
-                                    if len(parts) == 3:
-                                        key_length, fingerprint, algorithm = parts
-                                        # Create a new item for the algorithm
-                                        algorithm_item = QTreeWidgetItem(ssh_hostkey_parent_item)
-                                        algorithm_item.setText(0, f"Algorithm: {algorithm}")
-                                        # Create a nested item under the algorithm for the key length
-                                        key_length_item = QTreeWidgetItem(algorithm_item)
-                                        key_length_item.setText(0, f"Key Length: ")
-                                        key_length_item.setText(1, key_length)
-                                        # Create a nested item under the algorithm for the fingerprint
-                                        fingerprint_item = QTreeWidgetItem(algorithm_item)
-                                        fingerprint_item.setText(0, "Fingerprint")
-                                        fingerprint_item.setText(1, fingerprint)
-            self.results_tree.expandAll()  # Optionally expand all items by default
+                # Now handle 'ssh-hostkey' separately
+                if 'ssh-hostkey' in details:
+                    ssh_hostkey_output = details['ssh-hostkey']
+                    if ssh_hostkey_output:  # Check if there is any output to add
+                        ssh_hostkey_parent_item = QTreeWidgetItem(port_item)
+                        ssh_hostkey_parent_item.setText(0, "SSH-Hostkey")
+                        for line in ssh_hostkey_output.split('\n'):
+                            if line.strip():  # Make sure the line is not empty
+                                parts = line.strip().split(' ', 2)
+                                if len(parts) == 3:
+                                    key_length, fingerprint, algorithm = parts
+                                    # Create a new item for the algorithm
+                                    algorithm_item = QTreeWidgetItem(ssh_hostkey_parent_item)
+                                    algorithm_item.setText(0, f"Algorithm: {algorithm}")
+                                    # Create a nested item under the algorithm for the key length
+                                    key_length_item = QTreeWidgetItem(algorithm_item)
+                                    key_length_item.setText(0, f"Key Length: ")
+                                    key_length_item.setText(1, key_length)
+                                    # Create a nested item under the algorithm for the fingerprint
+                                    fingerprint_item = QTreeWidgetItem(algorithm_item)
+                                    fingerprint_item.setText(0, "Fingerprint")
+                                    fingerprint_item.setText(1, fingerprint)
+        self.results_tree.expandAll()  # Optionally expand all items by default
 
     def save_results_to_file(self, data):
-        """
-        Saves the scan results to a file in the specified format.
-
-        Args:
-            data (dict): A dictionary containing the scan results.
-
-        Returns:
-            None
-        """
         if not self.user_checked_save_to_file or not self.filename_to_save:
             return
         file_extension = os.path.splitext(self.filename_to_save)[1].lower()
@@ -646,22 +525,12 @@ class NmapGUI(QMainWindow):
                     file.write(f"Host: {host}\n")
                     for port, details in ports.items():
                         self.write_text_file(port, file, details)
+                    # ... (code to save as TXT)
         elif file_extension == ".json":
             with open(self.filename_to_save, 'w') as file:
                 json.dump(data, file, indent=4)
         
     def write_text_file(self, port, file, details):
-        """
-        Writes details about a network port to a text file.
-
-        Args:
-            port (int): The port number.
-            file (file): The file object to write to.
-            details (dict): A dictionary containing details about the port.
-
-        Returns:
-            None
-        """
         if port:
             file.write(f"  Port: {port}\n")
         else:
@@ -683,7 +552,7 @@ class NmapGUI(QMainWindow):
             for script, output in details['script'].items():
                 if "ERROR" not in output:
                     file.write(f"      {script}: {output}\n")
-                    
+                
         if 'ssh-hostkey' in details:
             ssh_hostkey_data = details['ssh-hostkey'].split('\n')[1:]  # Skip the first line if it's empty or not needed
             for line in ssh_hostkey_data:
@@ -699,12 +568,6 @@ class NmapGUI(QMainWindow):
                         file.write(f"      Fingerprint: {fingerprint}\n")
 
     def toggle_net_discovery(self, checked):
-        """
-        Toggles the network discovery feature on or off.
-
-        Args:
-            checked (bool): Whether the network discovery feature is checked or not.
-        """
         if checked:
             self.host_entry.setDisabled(True)
             self.file_button.setDisabled(True)
