@@ -1,0 +1,4 @@
+# add env folder to gitignore
+env/
+lib/
+temp/
